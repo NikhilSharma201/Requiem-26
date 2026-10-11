@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from typing import Dict, Any
 
 st.set_page_config(
@@ -22,7 +23,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 Investment Risk Prediction & Portfolio Optimization")
-st.caption("Real-Time yFinance Market Data, Dynamic Auto-Updating ML Risk Engine")
+st.caption("Real-Time yFinance Market Data, ARIMA Time-Series Forecasting & ML Risk Analytics")
 
 # --- SIDEBAR INPUTS ---
 st.sidebar.header("🛠️ Portfolio Setup")
@@ -34,6 +35,13 @@ benchmark_ticker = st.sidebar.selectbox(
     "Market Benchmark Comparison", 
     ["^GSPC", "^NDX", "^NSEI", "VT"], 
     format_func=lambda x: {"^GSPC": "S&P 500 (^GSPC)", "^NDX": "NASDAQ-100 (^NDX)", "^NSEI": "NIFTY 50 (^NSEI)", "VT": "Vanguard Total World (VT)"}[x]
+)
+
+forecast_horizon_input = st.sidebar.selectbox(
+    "🔮 ARIMA Forecast Horizon",
+    [7, 14, 30, 60, 90],
+    index=2,
+    format_func=lambda x: f"{x} Trading Days"
 )
 
 st.sidebar.subheader("Asset Allocations")
@@ -82,14 +90,19 @@ if abs(total_weight_pct - 100.0) > 0.01:
 else:
     st.sidebar.success("✅ Allocations equal 100%")
 
-force_reload = st.sidebar.button("🔄 Force Refresh Graphs", type="primary", use_container_width=True)
+force_reload = st.sidebar.button("🔄 Refresh Analytics & ARIMA", type="primary", use_container_width=True)
 
-def fetch_portfolio_analytics(alloc_dict: Dict[str, float], target_risk: str, bench: str) -> Any:
+def fetch_portfolio_analytics(alloc_dict: Dict[str, float], target_risk: str, bench: str, horizon: int) -> Any:
     try:
         res = requests.post(
             f"{BACKEND_URL}/analytics/evaluate",
-            json={"allocations": alloc_dict, "target_risk": target_risk, "benchmark": bench},
-            timeout=15
+            json={
+                "allocations": alloc_dict, 
+                "target_risk": target_risk, 
+                "benchmark": bench,
+                "forecast_days": horizon
+            },
+            timeout=20
         )
         if res.status_code == 200:
             return res.json()
@@ -105,20 +118,20 @@ current_input_state = {
     "target_risk": target_risk_input,
     "benchmark": benchmark_ticker,
     "total_investment": total_investment,
+    "forecast_horizon": forecast_horizon_input,
     "valid": (not has_duplicate) and (abs(total_weight_pct - 100.0) <= 0.01)
 }
 
-# Clear stale memory if graph fields are missing
 if "analytics_data" in st.session_state:
-    if "historical_growth" not in st.session_state.analytics_data or force_reload:
+    if "arima_forecast" not in st.session_state.analytics_data or force_reload:
         del st.session_state["analytics_data"]
         if "last_input_state" in st.session_state:
             del st.session_state["last_input_state"]
 
 if current_input_state["valid"]:
     if st.session_state.get("last_input_state") != current_input_state or "analytics_data" not in st.session_state:
-        with st.spinner("🔄 Fetching real market data & calculating historical growth simulation..."):
-            analytics = fetch_portfolio_analytics(allocations, target_risk_input, benchmark_ticker)
+        with st.spinner(f"🔮 Fitting ARIMA model & forecasting next {forecast_horizon_input} trading days..."):
+            analytics = fetch_portfolio_analytics(allocations, target_risk_input, benchmark_ticker, forecast_horizon_input)
             if analytics:
                 st.session_state.analytics_data = analytics
                 st.session_state.active_allocations = allocations
@@ -211,7 +224,6 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
         growth_df["date"] = pd.to_datetime(growth_df["date"])
         growth_df = growth_df.set_index("date")
         
-        # Multiply ratio curve by actual total investment dollar amount
         for col in growth_df.columns:
             growth_df[col] = growth_df[col] * total_investment
 
@@ -225,18 +237,92 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
                 f"Benchmark ({benchmark_ticker})": "#EF553B"
             }
         )
-        fig_growth.update_layout(
-            hovermode="x unified", 
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(t=20, b=20, l=20, r=20)
-        )
+        fig_growth.update_layout(hovermode="x unified", margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_growth, use_container_width=True)
-    else:
-        st.warning("⚠️ Historical growth simulation data is loading...")
 
     st.divider()
 
-    # 4. MARKET SCENARIO STRESS TESTING & RISK-RETURN SCATTER
+    # 4. ARIMA TIME SERIES FORECASTING CHART WITH HISTORICAL TRAIL OVERLAY
+    st.subheader(f"🔮 ARIMA {forecast_horizon_input}-Day Future Growth Forecast")
+    st.caption(f"Seamless transition: Recent 30-day historical performance connected to future {forecast_horizon_input}-day ARIMA trajectory")
+
+    if "arima_forecast" in analytics and analytics["arima_forecast"]:
+        arima_data = analytics["arima_forecast"]
+        trail_records = arima_data.get("historical_trail", [])
+        forecast_records = arima_data.get("forecast", [])
+        
+        fig_arima = go.Figure()
+
+        # 1. Historical Trail (Solid Orange Line)
+        if trail_records:
+            t_df = pd.DataFrame(trail_records)
+            t_df["date"] = pd.to_datetime(t_df["date"])
+            t_df["Value ($)"] = t_df["value"] * total_investment
+            
+            fig_arima.add_trace(go.Scatter(
+                x=t_df["date"],
+                y=t_df["Value ($)"],
+                mode='lines+markers',
+                name='Recent Historical Actuals ($)',
+                line=dict(color='#FF9900', width=3)
+            ))
+
+        # 2. Future Forecast & Confidence Bounds
+        if forecast_records:
+            f_df = pd.DataFrame(forecast_records)
+            f_df["date"] = pd.to_datetime(f_df["date"])
+            
+            f_df["Forecast ($)"] = f_df["forecast"] * total_investment
+            f_df["Worst Case (95% Lower)"] = f_df["lower_bound"] * total_investment
+            f_df["Best Case (95% Upper)"] = f_df["upper_bound"] * total_investment
+
+            # Lower bound line
+            fig_arima.add_trace(go.Scatter(
+                x=f_df["date"],
+                y=f_df["Worst Case (95% Lower)"],
+                mode='lines',
+                line=dict(width=0),
+                showlegend=False,
+                name="Worst Case (95% Lower)"
+            ))
+
+            # Upper bound line + filled confidence band
+            fig_arima.add_trace(go.Scatter(
+                x=f_df["date"],
+                y=f_df["Best Case (95% Upper)"],
+                mode='lines',
+                line=dict(width=0),
+                fill='tonexty',
+                fillcolor='rgba(0, 204, 150, 0.2)',
+                name="95% Confidence Band"
+            ))
+
+            # Forecast Mean Line (Green Dash-Dot Line)
+            fig_arima.add_trace(go.Scatter(
+                x=f_df["date"],
+                y=f_df["Forecast ($)"],
+                mode='lines+markers',
+                name=f'ARIMA Projected Horizon ({forecast_horizon_input} Days)',
+                line=dict(color='#00CC96', width=3, dash='dash')
+            ))
+
+            last_pred = f_df.iloc[-1]
+            st.success(
+                f"🔮 **{forecast_horizon_input}-Day Horizon Target:** Projected Value: **${last_pred['Forecast ($)']:,.2f}** "
+                f"(95% Range: **${last_pred['Worst Case (95% Lower)']:,.2f}** to **${last_pred['Best Case (95% Upper)']:,.2f}**)"
+            )
+
+        fig_arima.update_layout(
+            xaxis_title="Date Timeline (Past ➔ Future)",
+            yaxis_title="Portfolio Value ($)",
+            hovermode="x unified",
+            margin=dict(t=20, b=20, l=20, r=20)
+        )
+        st.plotly_chart(fig_arima, use_container_width=True)
+
+    st.divider()
+
+    # 5. MARKET SCENARIO STRESS TESTING & RISK-RETURN SCATTER
     col_st, col_sc = st.columns([1, 1])
 
     with col_st:

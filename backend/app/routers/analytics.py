@@ -15,6 +15,7 @@ from app.services.analytics import (
 from app.services.risk_engine import classify_portfolio_risk
 from app.services.allocation_engine import generate_recommended_allocation
 from app.services.ai_intelligence import generate_ai_market_intelligence
+from app.services.forecasting import forecast_portfolio_growth
 
 router = APIRouter(prefix="/analytics", tags=["Analytics & Risk ML"])
 
@@ -22,6 +23,7 @@ class PortfolioAnalysisRequest(BaseModel):
     allocations: Dict[str, float] = Field(..., json_schema_extra={"example": {"AAPL": 0.5, "MSFT": 0.5}})
     target_risk: Optional[str] = Field("Medium", json_schema_extra={"example": "Low"})
     benchmark: Optional[str] = Field("^GSPC", json_schema_extra={"example": "^GSPC"})
+    forecast_days: Optional[int] = Field(30, json_schema_extra={"example": 30})
 
 class RiskAnalysisResponse(BaseModel):
     risk_level: str
@@ -35,6 +37,7 @@ class RiskAnalysisResponse(BaseModel):
     ai_market_intelligence: Dict[str, Any]
     historical_growth: List[Dict[str, Any]]
     asset_stats: Dict[str, Dict[str, float]]
+    arima_forecast: Dict[str, Any]
 
 @router.post("/evaluate", response_model=RiskAnalysisResponse)
 def evaluate_portfolio(request: PortfolioAnalysisRequest):
@@ -48,10 +51,10 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
         
     tickers = list(weights.keys())
     benchmark_symbol = (request.benchmark or "^GSPC").upper().strip()
+    horizon = request.forecast_days or 30
     
     all_needed_tickers = tickers + [benchmark_symbol]
     
-    # Batch download real market historical data
     price_df = get_batch_historical_prices(all_needed_tickers, period="1y")
     
     if price_df.empty:
@@ -66,7 +69,6 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
         
     portfolio_price_df = price_df[tickers]
     
-    # Calculate Real Portfolio Returns & Metrics
     daily_returns, cum_returns = calculate_portfolio_returns(portfolio_price_df, weights)
     volatility = calculate_volatility(daily_returns)
     max_dd = calculate_max_drawdown(cum_returns)
@@ -75,20 +77,17 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
     
     top_risk_asset = max(risk_contribs, key=risk_contribs.get) if risk_contribs else tickers[0]
     
-    # Run ML Risk Classification
     risk_ml = classify_portfolio_risk(
         volatility=volatility,
         max_drawdown=max_dd,
         asset_count=len(tickers)
     )
     
-    # Generate Target Risk Allocation Recommendation
     recommended = generate_recommended_allocation(
         current_weights=weights,
         target_risk=request.target_risk or risk_ml["risk_level"]
     )
 
-    # Generate AI Qualitative Intelligence Report
     ai_intel = generate_ai_market_intelligence(
         allocations=weights,
         risk_level=risk_ml["risk_level"],
@@ -97,7 +96,7 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
         top_risk_asset=top_risk_asset
     )
     
-    # CALCULATE MULTI-STRATEGY HISTORICAL GROWTH PATHS
+    # 1. MULTI-STRATEGY HISTORICAL GROWTH PATHS
     returns_df = price_df.pct_change().dropna()
     
     user_w = pd.Series(weights)
@@ -128,7 +127,7 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
             f"Benchmark ({benchmark_symbol})": float(round(cum_bench.loc[date_idx], 4))
         })
 
-    # INDIVIDUAL ASSET STATS FOR SCATTER PLOT
+    # 2. INDIVIDUAL ASSET STATS
     asset_stats = {}
     for t in tickers:
         ann_ret = float(returns_df[t].mean() * 252 * 100)
@@ -137,6 +136,9 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
             "return_pct": round(ann_ret, 2),
             "volatility_pct": round(ann_vol, 2)
         }
+        
+    # 3. ARIMA DYNAMIC HORIZON FORECASTING
+    arima_data = forecast_portfolio_growth(user_daily, forecast_days=horizon)
     
     return RiskAnalysisResponse(
         risk_level=risk_ml["risk_level"],
@@ -149,5 +151,6 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
         recommended_allocation=recommended,
         ai_market_intelligence=ai_intel,
         historical_growth=growth_records,
-        asset_stats=asset_stats
+        asset_stats=asset_stats,
+        arima_forecast=arima_data
     )
