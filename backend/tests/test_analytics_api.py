@@ -22,7 +22,8 @@ def test_evaluate_portfolio_api_success(client, mock_batch_prices):
         payload = {
             "allocations": {"AAPL": 0.6, "MSFT": 0.4},
             "target_risk": "Low",
-            "benchmark": "^GSPC"
+            "benchmark": "^GSPC",
+            "period": "1y"
         }
         response = client.post("/analytics/evaluate", json=payload)
         assert response.status_code == 200
@@ -30,6 +31,7 @@ def test_evaluate_portfolio_api_success(client, mock_batch_prices):
         data = response.json()
         assert data["risk_level"] in ["Low", "Medium", "High"]
         assert "annualized_volatility" in data
+        assert "total_period_return_pct" in data
         assert "ai_market_intelligence" in data
 
 def test_evaluate_portfolio_invalid_allocation_sum(client):

@@ -22,19 +22,36 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 Investment Risk Prediction & Portfolio Optimization")
-st.caption("Real-Time yFinance Market Data, ARIMA Time-Series Forecasting & ML Risk Analytics")
+st.title("📈 Investment Risk & Portfolio Optimization Platform")
+st.caption("Real-Time yFinance Market Data, AI/ML Risk Scoring & ARIMA Future Predictions")
 
-# --- SIDEBAR INPUTS ---
-st.sidebar.header("🛠️ Portfolio Setup")
+# --- SIDEBAR WORKFLOW MODE SELECTOR ---
+st.sidebar.header("🎯 Select Workflow Mode")
+
+app_mode = st.sidebar.radio(
+    "Choose your goal:",
+    ["🆕 Build Portfolio from Scratch", "⚡ Enhance Existing Portfolio"],
+    index=0
+)
+
+st.sidebar.divider()
+st.sidebar.header("🛠️ Parameters Setup")
 
 user_id = st.sidebar.text_input("User ID", value="default_user")
 total_investment = st.sidebar.number_input("Total Investment ($)", min_value=100.0, value=10000.0, step=500.0)
 target_risk_input = st.sidebar.selectbox("Target Risk Level Preference", ["Low", "Medium", "High"], index=1)
+
 benchmark_ticker = st.sidebar.selectbox(
     "Market Benchmark Comparison", 
     ["^GSPC", "^NDX", "^NSEI", "VT"], 
     format_func=lambda x: {"^GSPC": "S&P 500 (^GSPC)", "^NDX": "NASDAQ-100 (^NDX)", "^NSEI": "NIFTY 50 (^NSEI)", "VT": "Vanguard Total World (VT)"}[x]
+)
+
+lookback_period = st.sidebar.selectbox(
+    "📅 Historical Analysis Time Range",
+    ["3m", "6m", "1y", "2y"],
+    index=2,
+    format_func=lambda x: {"3m": "3 Months", "6m": "6 Months", "1y": "1 Year", "2y": "2 Years"}[x]
 )
 
 forecast_horizon_input = st.sidebar.selectbox(
@@ -44,55 +61,83 @@ forecast_horizon_input = st.sidebar.selectbox(
     format_func=lambda x: f"{x} Trading Days"
 )
 
-st.sidebar.subheader("Asset Allocations")
-st.sidebar.write("Specify asset tickers and their allocations (%)")
+st.sidebar.divider()
 
-DEFAULT_PRESETS = [
-    {"ticker": "AAPL", "weight": 30.0},
-    {"ticker": "MSFT", "weight": 25.0},
-    {"ticker": "TSLA", "weight": 20.0},
-    {"ticker": "BND", "weight": 15.0},
-    {"ticker": "GOOGL", "weight": 10.0},
-    {"ticker": "AMZN", "weight": 0.0},
-    {"ticker": "NVDA", "weight": 0.0},
-    {"ticker": "SPY", "weight": 0.0},
-    {"ticker": "QQQ", "weight": 0.0},
-    {"ticker": "GLD", "weight": 0.0},
-]
-
-num_assets = st.sidebar.number_input("Number of Assets", min_value=1, max_value=10, value=5)
-
-allocations = {}
-seen_tickers = []
-has_duplicate = False
-
-for i in range(int(num_assets)):
-    preset = DEFAULT_PRESETS[i] if i < len(DEFAULT_PRESETS) else {"ticker": f"ASSET{i+1}", "weight": 0.0}
+# --- MODE 1: BUILD FROM SCRATCH PRESET BASKETS ---
+if app_mode == "🆕 Build Portfolio from Scratch":
+    st.sidebar.subheader("🌱 Scratch Strategy Theme")
     
-    col_t, col_w = st.sidebar.columns([1, 1])
-    ticker = col_t.text_input(f"Ticker {i+1}", value=preset["ticker"], key=f"t_{i}").upper().strip()
-    weight = col_w.number_input(f"Weight % {i+1}", min_value=0.0, max_value=100.0, value=preset["weight"], step=5.0, key=f"w_{i}")
+    style_theme = st.sidebar.selectbox(
+        "Investment Theme",
+        ["Balanced Growth & Income", "Defensive Capital Preservation", "Aggressive Innovation & Tech"]
+    )
     
-    if ticker:
-        if ticker in seen_tickers:
-            has_duplicate = True
-        else:
-            seen_tickers.append(ticker)
-        allocations[ticker] = weight / 100.0
+    if style_theme == "Defensive Capital Preservation" or target_risk_input == "Low":
+        scratch_allocs = {"BND": 0.40, "SPY": 0.30, "AAPL": 0.15, "GLD": 0.15}
+    elif style_theme == "Aggressive Innovation & Tech" or target_risk_input == "High":
+        scratch_allocs = {"NVDA": 0.35, "TSLA": 0.30, "AAPL": 0.20, "QQQ": 0.15}
+    else:  # Balanced
+        scratch_allocs = {"AAPL": 0.30, "MSFT": 0.25, "SPY": 0.25, "TSLA": 0.10, "BND": 0.10}
+        
+    st.sidebar.write("⚡ **Auto-Constructed Basket:**")
+    for t, w in scratch_allocs.items():
+        st.sidebar.write(f"- **{t}**: {w*100:.0f}% (${total_investment * w:,.2f})")
+        
+    allocations = scratch_allocs
+    has_duplicate = False
+    total_weight_pct = 100.0
 
-total_weight_pct = sum(allocations.values()) * 100.0
-
-if has_duplicate:
-    st.sidebar.error("⚠️ Duplicate tickers detected! Please ensure each asset ticker is unique.")
-
-if abs(total_weight_pct - 100.0) > 0.01:
-    st.sidebar.warning(f"⚠️ Allocations must sum to 100%. Current sum: **{total_weight_pct:.1f}%**")
+# --- MODE 2: ENHANCE EXISTING PORTFOLIO ---
 else:
-    st.sidebar.success("✅ Allocations equal 100%")
+    st.sidebar.subheader("Asset Allocations")
+    st.sidebar.write("Specify your current asset tickers and allocation weights (%)")
 
-force_reload = st.sidebar.button("🔄 Refresh Analytics & ARIMA", type="primary", use_container_width=True)
+    DEFAULT_PRESETS = [
+        {"ticker": "AAPL", "weight": 30.0},
+        {"ticker": "MSFT", "weight": 25.0},
+        {"ticker": "TSLA", "weight": 20.0},
+        {"ticker": "BND", "weight": 15.0},
+        {"ticker": "GOOGL", "weight": 10.0},
+        {"ticker": "AMZN", "weight": 0.0},
+        {"ticker": "NVDA", "weight": 0.0},
+        {"ticker": "SPY", "weight": 0.0},
+        {"ticker": "QQQ", "weight": 0.0},
+        {"ticker": "GLD", "weight": 0.0},
+    ]
 
-def fetch_portfolio_analytics(alloc_dict: Dict[str, float], target_risk: str, bench: str, horizon: int) -> Any:
+    num_assets = st.sidebar.number_input("Number of Assets", min_value=1, max_value=10, value=5)
+
+    allocations = {}
+    seen_tickers = []
+    has_duplicate = False
+
+    for i in range(int(num_assets)):
+        preset = DEFAULT_PRESETS[i] if i < len(DEFAULT_PRESETS) else {"ticker": f"ASSET{i+1}", "weight": 0.0}
+        
+        col_t, col_w = st.sidebar.columns([1, 1])
+        ticker = col_t.text_input(f"Ticker {i+1}", value=preset["ticker"], key=f"t_{i}").upper().strip()
+        weight = col_w.number_input(f"Weight % {i+1}", min_value=0.0, max_value=100.0, value=preset["weight"], step=5.0, key=f"w_{i}")
+        
+        if ticker:
+            if ticker in seen_tickers:
+                has_duplicate = True
+            else:
+                seen_tickers.append(ticker)
+            allocations[ticker] = weight / 100.0
+
+    total_weight_pct = sum(allocations.values()) * 100.0
+
+    if has_duplicate:
+        st.sidebar.error("⚠️ Duplicate tickers detected! Please ensure each asset ticker is unique.")
+
+    if abs(total_weight_pct - 100.0) > 0.01:
+        st.sidebar.warning(f"⚠️ Allocations must sum to 100%. Current sum: **{total_weight_pct:.1f}%**")
+    else:
+        st.sidebar.success("✅ Allocations equal 100%")
+
+force_reload = st.sidebar.button("🔄 Execute Analysis", type="primary", use_container_width=True)
+
+def fetch_portfolio_analytics(alloc_dict: Dict[str, float], target_risk: str, bench: str, horizon: int, period: str) -> Any:
     try:
         res = requests.post(
             f"{BACKEND_URL}/analytics/evaluate",
@@ -100,7 +145,8 @@ def fetch_portfolio_analytics(alloc_dict: Dict[str, float], target_risk: str, be
                 "allocations": alloc_dict, 
                 "target_risk": target_risk, 
                 "benchmark": bench,
-                "forecast_days": horizon
+                "forecast_days": horizon,
+                "period": period
             },
             timeout=20
         )
@@ -114,24 +160,26 @@ def fetch_portfolio_analytics(alloc_dict: Dict[str, float], target_risk: str, be
         return None
 
 current_input_state = {
+    "mode": app_mode,
     "allocations": allocations,
     "target_risk": target_risk_input,
     "benchmark": benchmark_ticker,
     "total_investment": total_investment,
     "forecast_horizon": forecast_horizon_input,
+    "lookback_period": lookback_period,
     "valid": (not has_duplicate) and (abs(total_weight_pct - 100.0) <= 0.01)
 }
 
 if "analytics_data" in st.session_state:
-    if "arima_forecast" not in st.session_state.analytics_data or force_reload:
+    if force_reload:
         del st.session_state["analytics_data"]
         if "last_input_state" in st.session_state:
             del st.session_state["last_input_state"]
 
 if current_input_state["valid"]:
     if st.session_state.get("last_input_state") != current_input_state or "analytics_data" not in st.session_state:
-        with st.spinner(f"🔮 Fitting ARIMA model & forecasting next {forecast_horizon_input} trading days..."):
-            analytics = fetch_portfolio_analytics(allocations, target_risk_input, benchmark_ticker, forecast_horizon_input)
+        with st.spinner(f"🔄 Executing {app_mode}... Evaluating market history ({lookback_period}) & fitting ARIMA forecast..."):
+            analytics = fetch_portfolio_analytics(allocations, target_risk_input, benchmark_ticker, forecast_horizon_input, lookback_period)
             if analytics:
                 st.session_state.analytics_data = analytics
                 st.session_state.active_allocations = allocations
@@ -144,17 +192,27 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
     analytics = st.session_state.analytics_data
     active_allocs = st.session_state.active_allocations
 
+    # HEADLINE BANNER ACCORDING TO MODE
+    if app_mode == "🆕 Build Portfolio from Scratch":
+        st.success(f"🌱 **Constructed New Portfolio Basket:** Capital allocated: **${total_investment:,.2f}** across **{len(active_allocs)}** assets tailored to **{target_risk_input} Risk**.")
+    else:
+        st.info(f"⚡ **Enhancing Existing Portfolio:** Analyzing **${total_investment:,.2f}** capital distribution across **{len(active_allocs)}** assets over **{lookback_period.upper()}** history.")
+
     # 1. TOP METRICS DASHBOARD
-    st.subheader("📊 Live Key Performance & Risk Metrics")
+    st.subheader("📊 Key Performance & Profit/Loss Metrics")
     
-    m1, m2, m3, m4, m5 = st.columns(5)
+    m1, m2, m3, m4, m5, m6 = st.columns(6)
     risk_color = "🟢" if analytics["risk_level"] == "Low" else ("🟡" if analytics["risk_level"] == "Medium" else "🔴")
+    
+    tot_ret = analytics.get("total_period_return_pct", 0.0)
+    profit_dollars = total_investment * (tot_ret / 100.0)
     
     m1.metric("ML Risk Level", f"{risk_color} {analytics['risk_level']}")
     m2.metric("Risk Score", f"{analytics['risk_score']:.1f} / 100")
     m3.metric("Annual Volatility", f"{analytics['annualized_volatility'] * 100:.2f}%")
     m4.metric("Max Drawdown (MDD)", f"{analytics['max_drawdown'] * 100:.2f}%")
     m5.metric("Sharpe Ratio", f"{analytics['sharpe_ratio']:.2f}")
+    m6.metric(f"Historical Return ({lookback_period.upper()})", f"{tot_ret:+.2f}%", f"${profit_dollars:+,.2f}")
 
     st.info(f"💡 **ML Risk Classification Reasoning:** {analytics['explanation']}")
 
@@ -191,7 +249,7 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
 
     with c2:
         st.subheader("⚖️ Portfolio Re-Allocation Recommendation")
-        st.caption(f"Suggested asset weights to target **{target_risk_input}** risk profile")
+        st.caption(f"Suggested asset redistribution to meet **{target_risk_input}** risk target")
         
         rec_data = []
         for ticker in active_allocs.keys():
@@ -216,8 +274,8 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
     st.divider()
 
     # 3. HISTORICAL SIMULATION & STRATEGY COMPARISON
-    st.subheader("📈 Multi-Strategy Real Historical Growth Simulation")
-    st.caption("1-Year historical value ($): User Portfolio vs Recommended Allocation vs Equal Weight vs Benchmark")
+    st.subheader(f"📈 Multi-Strategy Real Historical Growth ({lookback_period.upper()} Window)")
+    st.caption(f"Historical capital growth ($): Original Portfolio vs Recommended Allocation vs Equal Weight vs Benchmark over {lookback_period.upper()}")
 
     if "historical_growth" in analytics and analytics["historical_growth"]:
         growth_df = pd.DataFrame(analytics["historical_growth"])
@@ -244,7 +302,7 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
 
     # 4. ARIMA TIME SERIES FORECASTING CHART WITH HISTORICAL TRAIL OVERLAY
     st.subheader(f"🔮 ARIMA {forecast_horizon_input}-Day Future Growth Forecast")
-    st.caption(f"Seamless transition: Recent 30-day historical performance connected to future {forecast_horizon_input}-day ARIMA trajectory")
+    st.caption(f"Predicting portfolio trajectory over the next {forecast_horizon_input} trading days with 95% Confidence Bounds")
 
     if "arima_forecast" in analytics and analytics["arima_forecast"]:
         arima_data = analytics["arima_forecast"]
@@ -253,7 +311,6 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
         
         fig_arima = go.Figure()
 
-        # 1. Historical Trail (Solid Orange Line)
         if trail_records:
             t_df = pd.DataFrame(trail_records)
             t_df["date"] = pd.to_datetime(t_df["date"])
@@ -267,7 +324,6 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
                 line=dict(color='#FF9900', width=3)
             ))
 
-        # 2. Future Forecast & Confidence Bounds
         if forecast_records:
             f_df = pd.DataFrame(forecast_records)
             f_df["date"] = pd.to_datetime(f_df["date"])
@@ -276,7 +332,6 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
             f_df["Worst Case (95% Lower)"] = f_df["lower_bound"] * total_investment
             f_df["Best Case (95% Upper)"] = f_df["upper_bound"] * total_investment
 
-            # Lower bound line
             fig_arima.add_trace(go.Scatter(
                 x=f_df["date"],
                 y=f_df["Worst Case (95% Lower)"],
@@ -286,7 +341,6 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
                 name="Worst Case (95% Lower)"
             ))
 
-            # Upper bound line + filled confidence band
             fig_arima.add_trace(go.Scatter(
                 x=f_df["date"],
                 y=f_df["Best Case (95% Upper)"],
@@ -297,7 +351,6 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
                 name="95% Confidence Band"
             ))
 
-            # Forecast Mean Line (Green Dash-Dot Line)
             fig_arima.add_trace(go.Scatter(
                 x=f_df["date"],
                 y=f_df["Forecast ($)"],
@@ -307,9 +360,13 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
             ))
 
             last_pred = f_df.iloc[-1]
+            future_gain = last_pred['Forecast ($)'] - total_investment
+            future_gain_pct = (future_gain / total_investment) * 100.0
+            
             st.success(
-                f"🔮 **{forecast_horizon_input}-Day Horizon Target:** Projected Value: **${last_pred['Forecast ($)']:,.2f}** "
-                f"(95% Range: **${last_pred['Worst Case (95% Lower)']:,.2f}** to **${last_pred['Best Case (95% Upper)']:,.2f}**)"
+                f"🔮 **{forecast_horizon_input}-Day Projected Target:** Estimated Value: **${last_pred['Forecast ($)']:,.2f}** "
+                f"(Expected Gain: **${future_gain:+,.2f}** / **{future_gain_pct:+.2f}%**) | "
+                f"95% Bounds Range: **${last_pred['Worst Case (95% Lower)']:,.2f}** to **${last_pred['Best Case (95% Upper)']:,.2f}**"
             )
 
         fig_arima.update_layout(
@@ -380,4 +437,4 @@ if "analytics_data" in st.session_state and current_input_state["valid"]:
             st.plotly_chart(fig_scatter, use_container_width=True)
 
 else:
-    st.info("👈 Enter your asset allocations in the sidebar to begin real-time analysis!")
+    st.info("👈 Select your workflow mode in the sidebar to begin!")

@@ -1,31 +1,56 @@
 # 📈 Investment Risk Prediction & Portfolio Optimization System
 
-> **A Test-Driven, ML-Powered Portfolio Risk Evaluation & Allocation Platform**  
+> **A Test-Driven, ML-Powered Portfolio Risk Evaluation, Allocation & ARIMA Forecasting Platform**  
 > Built with FastAPI, Streamlit, PostgreSQL, `yfinance`, `scikit-learn`, and `statsmodels` (ARIMA).
 
 ---
 
 ## 📌 Executive Summary
 
-The **Investment Risk Prediction System** is a financial intelligence platform that evaluates portfolio risk, predicts future value trajectories, identifies single-asset risk drivers, and recommends dynamic re-allocation strategies based on user risk preferences. 
+The **Investment Risk Prediction System** is an end-to-end financial intelligence platform that empowers investors to either **build an optimal portfolio from scratch** or **enhance an existing stock portfolio**. 
 
-By integrating **Modern Portfolio Theory (MPT)** with **Machine Learning feature scoring** and **ARIMA time-series forecasting**, the system translates complex financial metrics into actionable, plain-English insights and interactive visual dashboards.
+By combining **Modern Portfolio Theory (MPT)**, **Machine Learning Risk Feature Scoring**, and **ARIMA Time-Series Forecasting**, the system calculates real-time volatility, detects single-asset risk drivers, simulates historical growth across custom timeframes, and projects future portfolio values with 95% confidence bounds.
+
+---
+
+## 🚀 Dual Workflow Operating Modes
+
+When opening the platform, users can choose between two specialized operational workflows:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SELECT WORKFLOW OPERATING MODE │
+└──────────────────────────────┬──────────────────────────────┬───────────────┘
+│ │
+▼ ▼
+┌──────────────────────────────────────────┐ ┌─────────────────────────────┐
+│ 🆕 MODE 1: BUILD FROM SCRATCH │ │ ⚡ MODE 2: ENHANCE EXISTING │
+├──────────────────────────────────────────┤ ├─────────────────────────────┤
+│ • Input total investment capital ($) │ │ • Input custom stock tickers│
+│ • Select target risk (Low/Medium/High) │ │ and percentage weights │
+│ • Choose investment theme (Defensive, │ │ • Detect hidden risk driver │
+│ Balanced Growth, Aggressive Innovation)│ │ assets & variance drivers │
+│ • Auto-constructs optimized portfolio │ │ • Recommend optimal fund │
+│ asset basket with profit/loss metrics │ │ redistribution weights │
+└──────────────────────────────────────────┘ └─────────────────────────────┘
+
+text
+
 
 ---
 
 ## 🏗️ System Architecture & Technology Stack
 
-The platform utilizes a **decoupled 3-tier architecture** designed for high throughput, low-latency vectorized calculations, and non-blocking database writes.
+The platform utilizes a **decoupled 3-tier microservice architecture** designed for high throughput, low-latency vectorized calculations, and non-blocking database writes.
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ FRONTEND (STREAMLIT) │
-│ - Interactive Sidebar Controls (Tickers, Weights, Risk Level, Horizon) │
+│ - Dual Workflow Mode Selector (Build Scratch vs. Enhance Existing) │
+│ - Interactive Controls (Lookback 3m-2y, Forecast Horizon 7d-90d) │
 │ - Plotly Visualizations (Risk Pie, Allocation Bar, Growth, ARIMA, Map) │
 └──────────────────────────────────────┬──────────────────────────────────────┘
 │ HTTP POST /analytics/evaluate
 ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ BACKEND (FASTAPI) │
-│ - REST Routers (Analytics, Market Ingestion, Portfolios) │
+│ - REST Routers (Analytics Engine, Market Ingestion, Portfolios) │
 │ - Schema Validation via Pydantic V2 │
 │ - Async Uvicorn ASGI Server │
 └──────────────┬───────────────────────┬───────────────────────┬──────────────┘
@@ -45,10 +70,10 @@ text
 
 | Layer | Technology | Function |
 | :--- | :--- | :--- |
-| **Frontend UI** | `Streamlit` | Reactive dashboard managing dynamic session state and auto-updating visualizations. |
+| **Frontend UI** | `Streamlit` | Reactive dashboard managing dynamic session state, workflow modes, and auto-updating visualizations. |
 | **Data Visualization** | `Plotly Express` / `Graph Objects` | Render engine for Factor Risk, Re-allocation Comparison, Growth, and ARIMA CI Bands. |
 | **Backend REST API** | `FastAPI` + `Uvicorn` | Asynchronous backend API engine executing financial pipelines and schema validation. |
-| **Market Data** | `yfinance` | Vectorized batch fetching of 1-year historical daily prices aligned across global markets. |
+| **Market Data** | `yfinance` | Vectorized batch fetching of historical daily prices aligned across global markets. |
 | **Data Processing** | `pandas` + `numpy` | Linear algebra, covariance matrix computation, and daily return calculations. |
 | **Machine Learning** | `scikit-learn` / Feature Scorer | Dynamic risk scoring (0–100) and risk tier categorization. |
 | **Time-Series Forecast** | `statsmodels` (ARIMA) | ARIMA(1,1,1) model with trend drift for 7 to 90-day future portfolio path projections. |
@@ -59,36 +84,39 @@ text
 
 ## 🎯 Key Features Breakdown
 
-### 1. Live Market Data Ingestion
-* Vectorized batch downloading via `yfinance` to eliminate row-by-row request latency.
-* MultiIndex column flattening and automatic date alignment across different exchange calendars.
+### 1. Dual Portfolio Modes
+* **Mode 1 (Build from Scratch):** Auto-constructs optimized baskets based on capital size, risk preference, and investment themes (*Balanced Growth*, *Defensive Preservation*, *Aggressive Tech*).
+* **Mode 2 (Enhance Existing Portfolio):** Evaluates user-defined ticker allocations, flags dangerous concentration risk, and suggests weight redistribution.
 
-### 2. Quantitative & ML Risk Engine
-* **Risk Meter (0–100 Score):** Scores portfolio risk using a weighted formula combining volatility, maximum drawdown, and asset concentration.
-* **Risk Categorization:** Classifies portfolios into `Low Risk`, `Medium Risk`, or `High Risk` tiers.
-* **Factor Risk Contribution:** Uses covariance matrix analysis to isolate which stock drives the highest variance.
+### 2. Custom Historical Lookback Windows
+* Flexible historical time-range analysis across **3 Months (`3m`)**, **6 Months (`6m`)**, **1 Year (`1y`)**, or **2 Years (`2y`)** to test performance across bull and bear regimes.
 
-### 3. Strategy Re-Allocation Engine
-* Generates target portfolio weights smoothed toward equal-weighted diversification to match desired risk profiles (`Low`, `Medium`, `High`).
+### 3. Net Profit / Loss Metrics
+* Calculates net dollar profit/loss (`$`) and return on investment (`% ROI`) over selected historical lookback windows.
 
-### 4. Multi-Strategy Historical Backtesting
-* 1-year time-machine growth simulation comparing:
+### 4. Quantitative & ML Risk Engine
+* **Risk Score (0–100 Meter):** Computes a composite risk score combining Annual Volatility (50%), Max Drawdown (40%), and Concentration Penalty (10%).
+* **Risk Categorization:** Classifies portfolios into `Low Risk`, `Medium Risk`, or `High Risk`.
+* **Factor Risk Contribution:** Uses covariance matrix analysis to isolate which specific stock drives the highest variance.
+
+### 5. Strategy Re-Allocation Engine
+* Proposes optimal asset weight distribution smoothed toward equal-weighted baseline to achieve target risk goals.
+
+### 6. Multi-Strategy Historical Backtesting
+* Time-machine growth simulation comparing 4 concurrent strategies:
   1. **User Original Portfolio**
   2. **ML Recommended Allocation**
   3. **Equal-Weighted Strategy**
   4. **Market Benchmark** (S&P 500 `^GSPC`, NASDAQ-100 `^NDX`, NIFTY 50 `^NSEI`, or VT)
 
-### 5. ARIMA Time-Series Forecasting
-* Projects future portfolio value over **7, 14, 30, 60, or 90 trading days**.
-* Generates a **95% Confidence Interval band** (fan chart/funnel) modeling compounding market uncertainty.
-* Connects seamlessly to the recent 30-day historical actuals line.
+### 7. ARIMA Time-Series Forecasting
+* Predicts expected portfolio growth over **7, 14, 30, 60, or 90 trading days**.
+* Generates a **95% Confidence Interval band** (fan chart/funnel) modeling compounding market uncertainty over time.
+* Connects the future projection line seamlessly to the recent 30-day historical actuals line.
 
-### 6. Macro Stress-Testing & Asset Map
+### 8. Macro Stress-Testing & Risk-Return Map
 * **Stress Test Engine:** Simulates capital impact during macroeconomic shocks (e.g., 2008 Financial Crisis -30%, Tech Crash -20%).
-* **Risk vs. Return Map:** Plotly scatter map positioning assets on Volatility ($\sigma$) vs Return ($R$) axes.
-
-### 7. AI Qualitative Market Intelligence
-* Generates plain-English narrative reports detailing tech concentration, defensive bond padding, and macro interest rate vulnerabilities.
+* **Risk vs. Return Map:** Plotly scatter map positioning individual assets on Volatility ($\sigma$) vs Return ($R$) axes.
 
 ---
 
@@ -113,7 +141,7 @@ text
 │ Weight: 50% │ │ Weight: 40% │ │ Weight: 10% │
 │ Measures instability │ │ Measures peak-to- │ │ Penalizes single-asset│
 │ of daily price │ │ trough worst drop │ │ dependency/lack of │
-│ fluctuations │ │ over past 1 year │ │ diversification │
+│ fluctuations │ │ over past timeframe │ │ diversification │
 └───────────────────────┘ └───────────────────────┘ └───────────────────────┘
 
 text
@@ -129,7 +157,7 @@ $$\sigma_{annual} = \text{StdDev}(R_{p,t}) \times \sqrt{252}$$
 $$\text{Vol\_Score} = \min\left(\frac{\sigma_{annual}}{0.35}, 1.0\right) \times 50$$
 
 #### 2. Maximum Drawdown ($MDD$) — *Weight: 40%*
-Evaluates worst peak-to-trough capital decline over 1 year to measure downside loss risk:
+Evaluates worst peak-to-trough capital decline over the selected time window to measure downside loss risk:
 
 $$V_t = \prod_{k=1}^{t} (1 + R_{p,k}), \quad \text{Peak}_t = \max_{1 \le k \le t} (V_k)$$
 
@@ -138,19 +166,9 @@ $$MDD = \max_{t} \left( \frac{\text{Peak}_t - V_t}{\text{Peak}_t} \right)$$
 $$\text{MDD\_Score} = \min\left(\frac{MDD}{0.40}, 1.0\right) \times 40$$
 
 #### 3. Concentration Penalty ($C$) — *Weight: 10%*
-Penalizes portfolios for lack of asset diversification:
+Penalizes portfolios for single-asset concentration:
 
 $$\text{Penalty} = \max(0.0, 10.0 - (\text{Asset Count} \times 2.0))$$
-
----
-
-### 🚦 Classification Thresholds
-
-| Total Score | Risk Tier | Description |
-| :--- | :--- | :--- |
-| **0.0 – 34.9** | 🟢 **Low Risk** | Low volatility ($<12\%$), minimal drawdowns ($<8\%$), heavy defensive asset weight. |
-| **35.0 – 69.9** | 🟡 **Medium Risk** | Standard equity volatility ($12\% - 25\%$), balanced risk-return profile. |
-| **70.0 – 100.0**| 🔴 **High Risk** | High volatility ($>25\%$), severe drawdown potential ($>25\%$), or single-asset concentration. |
 
 ---
 
@@ -172,13 +190,11 @@ $$y_t' = c + \phi_1 y_{t-1}' + \theta_1 \epsilon_{t-1} + \epsilon_t$$
 
 Where $y_t'$ is the first-differenced cumulative return series ($y_t - y_{t-1}$).
 
-#### 📈 Understanding the 95% Confidence Interval Band (Funnel)
-* **Center Line:** Expected mean forecast baseline ($y_{forecast}$).
+#### 📈 Understanding the 95% Confidence Interval Band
+* **Center Line:** Expected mean forecast baseline ($\hat{y}_t$).
 * **Shaded Fan Band:** 95% Confidence bounds modeling compounding market volatility over time:
 
 $$\text{Confidence Interval} = \hat{y}_t \pm 1.96 \times \text{SE}(\hat{y}_t)$$
-
-* As the forecast horizon extends into the future, uncertainty increases, causing the confidence band to widen naturally.
 
 ---
 
@@ -208,10 +224,22 @@ text
 
 ---
 
-## ⚡ Setup & Installation Guide
+## 🧪 Demo Test Data Sets (For Testing Mode 2)
+
+Use these fresh ticker sets in Mode 2 to demonstrate different platform capabilities to judges:
+
+| Test Scenario | Recommended Tickers & Allocations | Expected ML Risk Result |
+| :--- | :--- | :--- |
+| **High Volatility & Crypto** | `MSTR` (35%), `COIN` (25%), `PLTR` (20%), `META` (20%) | 🔴 **High Risk** (Score > 75) |
+| **Defensive Preservation** | `KO` (30%), `JNJ` (30%), `WM` (20%), `TLT` (20%) | 🟢 **Low Risk** (Score < 30) |
+| **Blue-Chip Financials** | `JPM` (30%), `XOM` (25%), `PG` (25%), `CAT` (20%) | 🟡 **Medium Risk** (Score ~45) |
+| **Global & Commodities** | `TSM` (30%), `NVO` (25%), `SLV` (25%), `ASML` (20%) | 🟡 **Medium Risk** (Broad Beta) |
+
+---
+
+## ⚡ Setup & Execution Guide
 
 ### Prerequisites
-* **OS:** Linux / Ubuntu (or macOS / WSL)
 * **Python:** Python 3.11
 * **Database:** PostgreSQL (local or remote instance)
 
@@ -220,28 +248,24 @@ text
 git clone https://github.com/your-username/investment-risk-prediction.git
 cd investment-risk-prediction
 
-# Create Python 3.11 venv
 python3.11 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
 2. Configure Environment Variables
-Create a .env file in the project root:
+Create .env in the project root:
 
 env
 
 DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/investment_risk_db
 TEST_DATABASE_URL=sqlite:///:memory:
-3. Run Pytest Test Suite (TDD Verification)
-Ensure all 21 unit and API integration tests pass:
-
+3. Run Pytest Suite (TDD Verification)
 Bash
 
 PYTHONPATH=backend pytest -v
-🚀 Running the Application
-Launch the backend and frontend in separate terminal windows:
+(All 21 unit and integration tests pass cleanly).
 
+🚀 Running the Application
 Terminal 1: Launch FastAPI Backend
 Bash
 
@@ -257,62 +281,12 @@ cd ~/investment-risk-prediction
 source venv/bin/activate
 
 streamlit run frontend/app.py
-Web Interface: http://localhost:8501
-📡 API Endpoint Reference
-POST /analytics/evaluate
-Evaluates portfolio risk metrics, ARIMA predictions, and allocation recommendations.
-
-Request Body
-JSON
-
-{
-  "allocations": {
-    "AAPL": 0.30,
-    "MSFT": 0.25,
-    "TSLA": 0.20,
-    "BND": 0.15,
-    "GOOGL": 0.10
-  },
-  "target_risk": "Low",
-  "benchmark": "^GSPC",
-  "forecast_days": 30
-}
-Response Payload (Excerpt)
-JSON
-
-{
-  "risk_level": "Medium",
-  "risk_score": 40.5,
-  "explanation": "Portfolio exhibits moderate price fluctuations...",
-  "annualized_volatility": 0.1731,
-  "max_drawdown": 0.1575,
-  "sharpe_ratio": 0.76,
-  "risk_contributions": {
-    "TSLA": 0.417,
-    "AAPL": 0.221,
-    "MSFT": 0.198,
-    "GOOGL": 0.137,
-    "BND": 0.027
-  },
-  "recommended_allocation": {
-    "AAPL": 0.23,
-    "MSFT": 0.21,
-    "TSLA": 0.18,
-    "BND": 0.23,
-    "GOOGL": 0.15
-  },
-  "ai_market_intelligence": {
-    "headline": "AI Analysis: Medium Risk Profile with 85% Tech...",
-    "insights": [
-      "🚀 High Growth Concentration...",
-      "⚠️ Primary Volatility Driver: TSLA..."
-    ]
-  },
-  "historical_growth": [...],
-  "arima_forecast": {
-    "historical_trail": [...],
-    "forecast": [...]
-  }
-}
+Web Dashboard: http://localhost:8501
 📄 License
 This project is open-source and available under the MIT License.
+
+
+
+
+
+

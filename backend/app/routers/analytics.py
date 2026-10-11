@@ -24,6 +24,7 @@ class PortfolioAnalysisRequest(BaseModel):
     target_risk: Optional[str] = Field("Medium", json_schema_extra={"example": "Low"})
     benchmark: Optional[str] = Field("^GSPC", json_schema_extra={"example": "^GSPC"})
     forecast_days: Optional[int] = Field(30, json_schema_extra={"example": 30})
+    period: Optional[str] = Field("1y", json_schema_extra={"example": "1y"})
 
 class RiskAnalysisResponse(BaseModel):
     risk_level: str
@@ -32,6 +33,7 @@ class RiskAnalysisResponse(BaseModel):
     annualized_volatility: float
     max_drawdown: float
     sharpe_ratio: float
+    total_period_return_pct: float
     risk_contributions: Dict[str, float]
     recommended_allocation: Dict[str, float]
     ai_market_intelligence: Dict[str, Any]
@@ -52,10 +54,11 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
     tickers = list(weights.keys())
     benchmark_symbol = (request.benchmark or "^GSPC").upper().strip()
     horizon = request.forecast_days or 30
+    lookback_period = request.period or "1y"
     
     all_needed_tickers = tickers + [benchmark_symbol]
     
-    price_df = get_batch_historical_prices(all_needed_tickers, period="1y")
+    price_df = get_batch_historical_prices(all_needed_tickers, period=lookback_period)
     
     if price_df.empty:
         raise HTTPException(status_code=400, detail="Failed to fetch real market data for requested tickers.")
@@ -75,6 +78,7 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
     sharpe = calculate_sharpe_ratio(daily_returns, volatility)
     risk_contribs = calculate_risk_contributions(portfolio_price_df, weights)
     
+    total_period_return = float(cum_returns.iloc[-1] * 100) if not cum_returns.empty else 0.0
     top_risk_asset = max(risk_contribs, key=risk_contribs.get) if risk_contribs else tickers[0]
     
     risk_ml = classify_portfolio_risk(
@@ -137,7 +141,7 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
             "volatility_pct": round(ann_vol, 2)
         }
         
-    # 3. ARIMA DYNAMIC HORIZON FORECASTING
+    # 3. ARIMA FORECASTING
     arima_data = forecast_portfolio_growth(user_daily, forecast_days=horizon)
     
     return RiskAnalysisResponse(
@@ -147,6 +151,7 @@ def evaluate_portfolio(request: PortfolioAnalysisRequest):
         annualized_volatility=round(volatility, 4),
         max_drawdown=round(max_dd, 4),
         sharpe_ratio=round(sharpe, 4),
+        total_period_return_pct=round(total_period_return, 2),
         risk_contributions=risk_contribs,
         recommended_allocation=recommended,
         ai_market_intelligence=ai_intel,
